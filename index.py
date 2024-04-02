@@ -86,3 +86,30 @@ def vectors(words):
         except:
             pass
 
+
+# hack together an "inverted index"
+documents = []
+inverted_index = {}
+for i, document in enumerate(train_ds):
+    embeddings = vectors(str(document[0]))
+    documents.append(document[0])
+    for w, e in embeddings:
+        key = tuple(e.tolist())
+        e_index = inverted_index.get(key, [])
+        e_index.append(i)
+        inverted_index[key] = e_index
+
+
+def search(terms):
+    import numpy
+    embeddings = vectors(terms)
+    scores = {}
+    for _, e in embeddings:
+        for ie, documents in inverted_index.items():
+            c = numpy.corrcoef([e, ie])
+            for d in documents:
+                score = scores.get(d, 0)
+                score += c
+                scores[d] = score
+
+    return scores.items()
