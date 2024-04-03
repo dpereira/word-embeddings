@@ -4,6 +4,12 @@ import re
 import shutil
 import string
 import tensorflow as tf
+import nltk
+from nltk.corpus import stopwords
+
+nltk.download('stopwords')
+sw = stopwords.words('english')
+
 
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense, Embedding, GlobalAveragePooling1D
@@ -75,12 +81,14 @@ model.fit(
 model.summary()
 
 weights = model.get_layer('embedding').get_weights()[0]
-vocab = vectorize_layer.get_vocabulary()
+vocab = [v for v in vectorize_layer.get_vocabulary() if v not in sw]
 
 index = dict(zip(vocab, weights))
 
 def vectors(words):
     for word in words.split(" "):
+        if word in sw:
+            continue
         try:
             yield word, index[word]
         except:
@@ -90,26 +98,49 @@ def vectors(words):
 # hack together an "inverted index"
 documents = []
 inverted_index = {}
-for i, document in enumerate(train_ds):
-    embeddings = vectors(str(document[0]))
-    documents.append(document[0])
-    for w, e in embeddings:
-        key = tuple(e.tolist())
-        e_index = inverted_index.get(key, [])
-        e_index.append(i)
-        inverted_index[key] = e_index
+
+counter = 0
+for i, t in enumerate(train_ds):
+    for j, s in enumerate(t[0]):
+        d = s.numpy().decode()
+        print(f"Indexing @ {counter} {i, j}: {d[:20]}...")
+        embeddings = vectors(d)
+        documents.append(d)
+        for w, e in embeddings:
+            key = tuple(e.tolist())
+            e_index = inverted_index.get(key, [])
+            e_index.append(counter)
+            inverted_index[key] = e_index
+        counter += 1
+
+#import sys
+#sys.exit(0)
+#
+#for i, document in enumerate(train_ds):
+#    embeddings = vectors(str(document[0]))
+#    documents.append(document[0])
+#    for w, e in embeddings:
+#        key = tuple(e.tolist())
+#        e_index = inverted_index.get(key, [])
+#        e_index.append(i)
+#        inverted_index[key] = e_index
 
 
-def search(terms):
+lookup = {tuple(e.tolist()): w for w, e in index.items()}
+def search(terms, threshold=.3):
     import numpy
+    termvector = terms.split()
     embeddings = vectors(terms)
     scores = {}
-    for _, e in embeddings:
+    for i, (_, e) in enumerate(embeddings):
         for ie, documents in inverted_index.items():
-            c = numpy.corrcoef([e, ie])
+            c = numpy.corrcoef([e, ie])[0][1]
+            if abs(c) < threshold:
+                continue
             for d in documents:
-                score = scores.get(d, 0)
+                score, explanation = scores.get(d, (0, []))
+                explanation.append((termvector[i], lookup[ie], c))
                 score += c
-                scores[d] = score
+                scores[d] = score, explanation
 
-    return scores.items()
+    return sorted([(d, s[0], sorted(s[1], key=lambda c: c[2])) for d, s in scores.items()], key=lambda k: k[1], reverse=True)
