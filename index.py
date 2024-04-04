@@ -144,3 +144,15 @@ def search(terms, threshold=.3):
                 scores[d] = score, explanation
 
     return sorted([(d, s[0], sorted(s[1], key=lambda c: c[2])) for d, s in scores.items()], key=lambda k: k[1], reverse=True)
+
+def correlation_score(term):
+    import numpy
+    t, embedding = list(vectors(term))[0]
+
+    corrs = []
+
+    for w, e in index.items():
+        c = numpy.corrcoef([embedding, e])[0][1]
+        corrs.append((c, w))
+
+    return corrs
