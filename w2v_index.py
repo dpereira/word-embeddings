@@ -143,8 +143,23 @@ for line in lines[:20]:
 
 #text_ds = tf.data.TextLineDataset(path_to_file).filter(lambda x: tf.cast(tf.strings.length(x), bool))
 
+def remove_encoding_errors(files):
+    ok = []
+    for f in files:
+        with open(f) as stream:
+            try:
+                stream.read()
+                ok.append(f)
+            except:
+                pass
+
+    return ok
+
 import glob
 files = list(glob.glob("aclImdb/train/**/*.txt", recursive=True)) + list(glob.glob("aclImdb/test/**/*.txt", recursive=True))
+files += list(glob.glob("literature/**/*.txt", recursive=True))
+
+files = remove_encoding_errors(files)
 
 print(files)
 text_ds = tf.data.TextLineDataset(files).filter(lambda x: tf.cast(tf.strings.length(x), bool))
