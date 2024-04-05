@@ -28,3 +28,5 @@ Out[32]:
 [Word embeddings @ Tensorflow](https://www.tensorflow.org/text/guide/word_embeddings)
 
 [Word2Vec @ Tensorflow](https://www.tensorflow.org/text/tutorials/word2vec)
+
+[Classic literature corpus](https://www.kaggle.com/datasets/mylesoneill/classic-literature-in-ascii)
