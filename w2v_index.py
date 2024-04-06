@@ -1,3 +1,4 @@
+import glob
 import io
 import re
 import string
@@ -7,6 +8,25 @@ import numpy as np
 
 import tensorflow as tf
 from tensorflow.keras import layers
+
+
+def remove_encoding_errors(files):
+    ok = []
+    contents = []
+    for f in files:
+        with open(f) as stream:
+            try:
+                contents.append(stream.read())
+                ok.append(f)
+            except:
+                pass
+
+    return ok, contents
+
+
+files = list(glob.glob("aclImdb/train/**/*.txt", recursive=True)) + list(glob.glob("aclImdb/test/**/*.txt", recursive=True))
+files += list(glob.glob("literature/**/*.txt", recursive=True))
+files, documents = remove_encoding_errors(files)
 
 
 def train():
@@ -134,36 +154,6 @@ def train():
 
       return targets, contexts, labels
 
-    path_to_file = tf.keras.utils.get_file('shakespeare.txt', 'https://storage.googleapis.com/download.tensorflow.org/data/shakespeare.txt')
-
-
-    with open(path_to_file) as f:
-      lines = f.read().splitlines()
-    for line in lines[:20]:
-      print(line)
-
-
-    #text_ds = tf.data.TextLineDataset(path_to_file).filter(lambda x: tf.cast(tf.strings.length(x), bool))
-
-    def remove_encoding_errors(files):
-        ok = []
-        for f in files:
-            with open(f) as stream:
-                try:
-                    stream.read()
-                    ok.append(f)
-                except:
-                    pass
-
-        return ok
-
-    import glob
-    files = list(glob.glob("aclImdb/train/**/*.txt", recursive=True)) + list(glob.glob("aclImdb/test/**/*.txt", recursive=True))
-    files += list(glob.glob("literature/**/*.txt", recursive=True))
-
-    files = remove_encoding_errors(files)
-
-    print(files)
     text_ds = tf.data.TextLineDataset(files).filter(lambda x: tf.cast(tf.strings.length(x), bool))
 
 
@@ -300,6 +290,7 @@ import pickle, os
 
 VOCAB = "vocab.dump"
 WEIGHTS = "weights.dump"
+INDEX = "index.dump"
 
 def save(vocab, weights):
     with open(VOCAB, "wb+") as f:
@@ -337,41 +328,37 @@ def vectors(words):
 
 
 # hack together an "inverted index"
-documents = []
 inverted_index = {}
 
-#counter = 0
-#for i, t in enumerate(train_ds):
-#    for j, s in enumerate(t[0]):
-#        d = s.numpy().decode()
-#        print(f"Indexing @ {counter} {i, j}: {d[:20]}...")
-#        embeddings = vectors(d)
-#        documents.append(d)
-#        for w, e in embeddings:
-#            key = tuple(e.tolist())
-#            e_index = inverted_index.get(key, [])
-#            e_index.append(counter)
-#            inverted_index[key] = e_index
-#        counter += 1
-#
-#lookup = {tuple(e.tolist()): w for w, e in index.items()}
-#def search(terms, threshold=.3):
-#    import numpy
-#    termvector = terms.split()
-#    embeddings = vectors(terms)
-#    scores = {}
-#    for i, (_, e) in enumerate(embeddings):
-#        for ie, documents in inverted_index.items():
-#            c = numpy.corrcoef([e, ie])[0][1]
-#            if abs(c) < threshold:
-#                continue
-#            for d in documents:
-#                score, explanation = scores.get(d, (0, []))
-#                explanation.append((termvector[i], lookup[ie], c))
-#                score += c
-#                scores[d] = score, explanation
-#
-#    return sorted([(d, s[0], sorted(s[1], key=lambda c: c[2])) for d, s in scores.items()], key=lambda k: k[1], reverse=True)
+
+for i, d in enumerate(documents):
+    print(f"Indexing @ {i}: {d[:20]}...")
+    embeddings = vectors(d)
+    for w, e in embeddings:
+        key = tuple(e.tolist())
+        e_index = inverted_index.get(key, [])
+        e_index.append(i)
+        inverted_index[key] = e_index
+
+
+lookup = {tuple(e.tolist()): w for w, e in index.items()}
+def search(terms, threshold=.3):
+    import numpy
+    termvector = terms.split()
+    embeddings = vectors(terms)
+    scores = {}
+    for i, (_, e) in enumerate(embeddings):
+        for ie, documents in inverted_index.items():
+            c = numpy.corrcoef([e, ie])[0][1]
+            if abs(c) < threshold:
+                continue
+            for d in documents:
+                score, explanation = scores.get(d, (0, []))
+                explanation.append((termvector[i], lookup[ie], c))
+                score += c
+                scores[d] = score, explanation
+
+    return sorted([(d, s[0], sorted(s[1], key=lambda c: c[2])) for d, s in scores.items()], key=lambda k: k[1], reverse=True)
 
 def correlation_score(term):
     import numpy
