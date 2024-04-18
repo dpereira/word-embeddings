@@ -11,6 +11,7 @@ python = "3.11.*"
 tensorflow = {version = "2.15.0", extras = ["keras"]}
 tqdm = "^4.66.2"
 ipython = "^8.23.0"
+annoy = "^1.17.3"
 
 
 [build-system]

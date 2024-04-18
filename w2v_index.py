@@ -10,6 +10,9 @@ import tensorflow as tf
 from tensorflow.keras import layers
 
 
+EMBEDDING_DIM = 128
+
+
 def remove_encoding_errors(files):
     ok = []
     contents = []
@@ -18,18 +21,19 @@ def remove_encoding_errors(files):
             try:
                 contents.append(stream.read())
                 ok.append(f)
-            except:
-                pass
+            except Exception as e:
+                print(f"Error for {f}: {e}")
 
     return ok, contents
 
 
-files = list(glob.glob("aclImdb/train/**/*.txt", recursive=True)) + list(glob.glob("aclImdb/test/**/*.txt", recursive=True))
-files += list(glob.glob("literature/**/*.txt", recursive=True))
+#files = list(glob.glob("aclImdb/train/**/*.txt", recursive=True)) + list(glob.glob("aclImdb/test/**/*.txt", recursive=True))
+files = list(glob.glob("literature/**/*.txt", recursive=True))
 files, documents = remove_encoding_errors(files)
 
 
 def train():
+    global files
     SEED = 42
     AUTOTUNE = tf.data.AUTOTUNE
 
@@ -249,7 +253,7 @@ def train():
     def custom_loss(x_logit, y_true):
           return tf.nn.sigmoid_cross_entropy_with_logits(logits=x_logit, labels=y_true)
 
-    embedding_dim = 128
+    embedding_dim = EMBEDDING_DIM
     word2vec = Word2Vec(vocab_size, embedding_dim)
     word2vec.compile(optimizer='adam',
                      loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True),
@@ -328,17 +332,42 @@ def vectors(words):
 
 
 # hack together an "inverted index"
-inverted_index = {}
+#inverted_index = {}
+#
+#
+#for i, d in enumerate(documents):
+#    print(f"Indexing @ {i}: {d[:20]}...")
+#    embeddings = vectors(d)
+#    for w, e in embeddings:
+#        key = tuple(e.tolist())
+#        e_index = inverted_index.get(key, [])
+#        e_index.append(i)
+#        inverted_index[key] = e_index
+#
 
+# create ann index
+from annoy import AnnoyIndex
 
+aindex = AnnoyIndex(EMBEDDING_DIM, 'angular')
 for i, d in enumerate(documents):
     print(f"Indexing @ {i}: {d[:20]}...")
     embeddings = vectors(d)
     for w, e in embeddings:
-        key = tuple(e.tolist())
-        e_index = inverted_index.get(key, [])
-        e_index.append(i)
-        inverted_index[key] = e_index
+        aindex.add_item(i, e.tolist())
+
+aindex.build(10)
+
+def asearch(terms, threshold=-1):
+    embeddings = vectors(terms)
+    scores = {}
+    for i, (_, e) in enumerate(embeddings):
+        documents, term_scores = aindex.get_nns_by_vector(e, threshold, include_distances=True)
+        for d, s in zip(documents, term_scores):
+            score = scores.get(d, 0)
+            score += s
+            scores[d] = score
+
+    return sorted([(d, s) for d, s in scores.items()], key=lambda i: i[1])
 
 
 lookup = {tuple(e.tolist()): w for w, e in index.items()}
