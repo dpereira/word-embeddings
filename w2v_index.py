@@ -224,7 +224,7 @@ def train():
             np.append(contexts, context)
 
         if labels is None:
-            labels = np.array([labels])
+            labels = np.array([label])
         else:
             np.append(labels, label)
 
