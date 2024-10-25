@@ -152,11 +152,12 @@ def train():
           label = tf.constant([1] + [0]*num_ns, dtype="int64")
 
           # Append each element from the training example to global lists.
-          targets.append(target_word)
-          contexts.append(context)
-          labels.append(label)
+          yield target_word, context, label
+          #targets.append(target_word)
+          #contexts.append(context)
+          #labels.append(label)
 
-      return targets, contexts, labels
+      #return targets, contexts, labels
 
     text_ds = tf.data.TextLineDataset(files).filter(lambda x: tf.cast(tf.strings.length(x), bool))
 
@@ -199,16 +200,38 @@ def train():
     for seq in sequences[:5]:
       print(f"{seq} => {[inverse_vocab[i] for i in seq]}")
 
-    targets, contexts, labels = generate_training_data(
+    data_generator = generate_training_data(
         sequences=sequences,
         window_size=2,
         num_ns=4,
         vocab_size=vocab_size,
-        seed=SEED)
+        seed=SEED
+    )
 
-    targets = np.array(targets)
-    contexts = np.array(contexts)
-    labels = np.array(labels)
+    targets = None
+    contexts = None
+    labels = None
+
+    for target, context, label in data_generator:
+        if targets is None:
+            targets = np.array([target])
+        else:
+            np.append(targets, target)
+
+        if contexts is None:
+            contexts = np.array([context])
+        else:
+            np.append(contexts, context)
+
+        if labels is None:
+            labels = np.array([labels])
+        else:
+            np.append(labels, label)
+
+
+    #targets = np.array(targets)
+    #contexts = np.array(contexts)
+    #labels = np.array(labels)
 
     print('\n')
     print(f"targets.shape: {targets.shape}")
